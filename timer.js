@@ -16,25 +16,21 @@ window.onload=function() {
     if (start != 0 && timerRunning == 1) {
       yellowTime = Date.now();
       yellowMark = yellowTime;
-      $("#yellow-time").text("Yellow: " + timeToString(yellowMark - start));
-      $("#yellow-percent").removeClass("label-warning");
-      $("#yellow-percent").removeClass("label-danger");
-      $("#yellow-percent").text("Yellow %: 0.00%");
+      var dryingAtYellow = (yellowMark - startTime) / 1000;
+      $("#yellow-time").text("Yellow Starts: " + timeToString(yellowMark - start));
+      $("#drying").text("Drying Total Time: " + formatTime(dryingAtYellow));
+      $("#drying-percent").text("Drying %: 100.0%");
+      $("#maillard-percent, #yellow-percent").removeClass("label-warning");
+      $("#maillard-percent, #yellow-percent").removeClass("label-danger");
+      $("#maillard-percent, #yellow-percent").text("Maillard %: 0.0%");
       updatePhases();
 
       if (yellowInterval != 0) {
         clearInterval(yellowInterval);
       }
       yellowInterval = setInterval(function() {
-        var currentTimeMillis = new Date().getTime() - start;
-        var currentTimeSeconds = Math.floor(currentTimeMillis / 1000);
-        var maillardMillis = new Date().getTime() - yellowMark;
-        var maillardSeconds = Math.floor(maillardMillis / 1000);
-
-        if (currentTimeSeconds > 0 && maillardSeconds >= 0) {
-          var yellowPercent = ((maillardSeconds / currentTimeSeconds) * 100).toFixed(2);
-          $("#yellow-percent").text("Yellow %: " + yellowPercent + "%");
-        }
+        // Keep phase-derived values (like Drying %) live while roast is running.
+        updatePhases();
       }, 1000);
     }
   }
@@ -50,7 +46,7 @@ window.onload=function() {
 
     if (yellowTime == 0 && startTime) {
       yellowTime = dropTime;
-      $("#yellow-time").text("Yellow: " + timeToString(yellowTime - start));
+      $("#yellow-time").text("Yellow Starts: " + timeToString(yellowTime - start));
     }
 
     updatePhases();
@@ -67,11 +63,12 @@ window.onload=function() {
     } else {
       $("#development-time").text("Development %: n/a (set First Crack)");
       if (startTime) {
-        $("#drying").text("Drying: " + formatTime((dropTime - startTime) / 1000));
+        $("#drying").text("Drying Total Time: " + formatTime((dropTime - startTime) / 1000));
+        $("#drying-percent").text("Drying %: 100.0%");
+        $("#maillard-percent, #yellow-percent").text("Maillard %: 0.0%");
       }
-      $("#maillard").text("Maillard: n/a");
-      $("#development").text("Development: n/a");
-      $("#devpercent").text("Dev %: n/a");
+      $("#maillard").text("Maillard Total Time: n/a");
+      $("#development").text("Development (Time): n/a");
     }
 
     if (fcInterval != 0) {
@@ -116,18 +113,18 @@ window.onload=function() {
       $(this).removeClass("btn-warning");
       $(this).addClass("btn-primary");
       $(".jumbotron h1#timer").text("00:00");
-      $("#yellow-time").text("Yellow: ");
-      $("#yellow-percent").text("Yellow %: ");
-      $("#yellow-percent").removeClass("label-warning");
-      $("#yellow-percent").removeClass("label-danger");
-      $("#first-crack").text("First Crack: ");
-      $("#development-time").text("Development: ");
+      $("#yellow-time").text("Yellow Starts: ");
+      $("#maillard-percent, #yellow-percent").text("Maillard %: ");
+      $("#maillard-percent, #yellow-percent").removeClass("label-warning");
+      $("#maillard-percent, #yellow-percent").removeClass("label-danger");
+      $("#first-crack").text("First Crack Starts: ");
+      $("#development-time").text("Development %: ");
       $("#development-time").removeClass("label-warning");
       $("#development-time").removeClass("label-danger");
-      $("#drying").text("Drying: ");
-      $("#maillard").text("Maillard: ");
-      $("#development").text("Development: ");
-      $("#devpercent").text("Dev %: ");
+      $("#drying").text("Drying Total Time: ");
+      $("#drying-percent").text("Drying %: ");
+      $("#maillard").text("Maillard Total Time: ");
+      $("#development").text("Development (Time): ");
       $("#lowest").text("15.0%: ");
       $("#lower").text("17.5%: ");
       $("#low").text("20.0%: ");
@@ -156,11 +153,24 @@ window.onload=function() {
       firstCrackTime = Date.now();
       firstCrack = firstCrackTime;
       $("#first-crack").addClass("label-success");
-      $("#first-crack").text("First Crack: " + timeToString(firstCrack - start));
+      $("#first-crack").text("First Crack Starts: " + timeToString(firstCrack - start));
       $("#firstCrackButtons").toggle();
       $("#development-time").removeClass("label-warning");
       $("#development-time").removeClass("label-danger");
       updatePhases();
+
+      if (yellowTime && startTime) {
+        var maillardAtFirstCrack = (firstCrackTime - yellowTime) / 1000;
+        var totalAtFirstCrack = (firstCrackTime - startTime) / 1000;
+        var maillardPercentAtFirstCrack = 0;
+
+        if (totalAtFirstCrack > 0) {
+          maillardPercentAtFirstCrack = (maillardAtFirstCrack / totalAtFirstCrack * 100).toFixed(1);
+        }
+
+        $("#maillard").text("Maillard Total Time: " + formatTime(maillardAtFirstCrack));
+        $("#maillard-percent, #yellow-percent").text("Maillard %: " + maillardPercentAtFirstCrack + "%");
+      }
   
       if (fcInterval != 0) {
         clearInterval(fcInterval); 
@@ -219,25 +229,31 @@ window.onload=function() {
   function updatePhases() {
     if (yellowTime && startTime) {
       var drying = (yellowTime - startTime) / 1000;
-      $("#drying").text("Drying: " + formatTime(drying));
-    }
+      var totalForDryingPercent = ((dropTime || Date.now()) - startTime) / 1000;
+      var maillardEndTime = firstCrackTime || dropTime || Date.now();
+      var maillard = (maillardEndTime - yellowTime) / 1000;
+      var totalForMaillardPercent = ((dropTime || Date.now()) - startTime) / 1000;
+      var dryingPercent = 0;
+      var maillardPercent = 0;
 
-    if (firstCrackTime && yellowTime) {
-      var maillard = (firstCrackTime - yellowTime) / 1000;
-      $("#maillard").text("Maillard: " + formatTime(maillard));
+      if (totalForDryingPercent > 0) {
+        dryingPercent = (drying / totalForDryingPercent * 100).toFixed(1);
+      }
+
+      if (totalForMaillardPercent > 0) {
+        maillardPercent = (maillard / totalForMaillardPercent * 100).toFixed(1);
+      }
+
+      $("#drying").text("Drying Total Time: " + formatTime(drying));
+      $("#drying-percent").text("Drying %: " + dryingPercent + "%");
+      $("#maillard").text("Maillard Total Time: " + formatTime(maillard));
+      $("#maillard-percent, #yellow-percent").text("Maillard %: " + maillardPercent + "%");
     }
 
     if (dropTime && firstCrackTime && startTime) {
       var development = (dropTime - firstCrackTime) / 1000;
-      var total = (dropTime - startTime) / 1000;
-      var devPercent = 0;
 
-      $("#development").text("Development: " + formatTime(development));
-
-      if (total > 0) {
-        devPercent = (development / total * 100).toFixed(1);
-      }
-      $("#devpercent").text("Dev %: " + devPercent + "%");
+      $("#development").text("Development (Time): " + formatTime(development));
     }
   }
 
